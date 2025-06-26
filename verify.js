@@ -1,39 +1,23 @@
-// File: /api/verify.js
-// এই ফাইলটি শুধুমাত্র টেলিগ্রাম চ্যানেলে সদস্যপদ যাচাই করবে
+import clientPromise from '../lib/mongodb';
 
 export default async function handler(req, res) {
-  // শুধুমাত্র POST রিকোয়েস্ট গ্রহণ করা হবে
-  if (req.method !== 'POST') {
-    return res.status(405).json({ success: false, message: 'Method Not Allowed' });
-  }
-
-  // আপনার গোপন তথ্যগুলো Vercel-এর Environment Variables থেকে আসবে
-  const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-  const CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID;
-
-  // এক্সটেনশন থেকে পাঠানো userId
-  const { userId } = req.body;
-
-  if (!userId) {
-    return res.status(400).json({ success: false, message: 'User ID is required' });
-  }
-
+  if (req.method !== 'POST') return res.status(405).json({ s: false, m: 'Method Not Allowed' });
+  const { licenseKey, deviceId } = req.body;
+  if (!licenseKey || !deviceId) return res.status(400).json({ s: false, m: 'License & Device ID required' });
+  
   try {
-    const url = `https://api.telegram.org/bot${BOT_TOKEN}/getChatMember?chat_id=${CHANNEL_ID}&user_id=${userId}`;
-    
-    const telegramResponse = await fetch(url);
-    const data = await telegramResponse.json();
+    const client = await clientPromise;
+    const db = client.db("mainDb");
+    const licenses = db.collection("licenses");
+    const license = await licenses.findOne({ licenseKey });
 
-    // ইউজার যদি চ্যানেলের সদস্য হয়, তার স্ট্যাটাস হবে 'member', 'administrator', or 'creator'
-    if (data.ok && ['member', 'administrator', 'creator'].includes(data.result.status)) {
-      // সদস্য হলে সফল উত্তর পাঠানো হবে
-      return res.status(200).json({ success: true, message: 'User is a valid member.' });
-    } else {
-      // সদস্য না হলে ব্যর্থ উত্তর পাঠানো হবে
-      return res.status(200).json({ success: false, message: 'User not authorized.' });
-    }
-  } catch (error) {
-    console.error("Error verifying user:", error);
-    return res.status(500).json({ success: false, message: 'An internal server error occurred.' });
+    if (!license) return res.status(200).json({ s: false, m: 'License key not found.' });
+    if (license.deviceId !== deviceId) return res.status(200).json({ s: false, m: 'Device mismatch.' });
+    if (new Date(license.expiresAt) < new Date()) return res.status(200).json({ s: false, m: 'License has expired.' });
+    if (license.status !== 'active') return res.status(200).json({ s: false, m: 'License is not active.' });
+
+    return res.status(200).json({ s: true, m: 'Verification successful.' });
+  } catch (e) {
+    return res.status(500).json({ s: false, m: 'Server error during verification.' });
   }
 }
