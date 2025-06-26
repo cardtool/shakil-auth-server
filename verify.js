@@ -1,7 +1,7 @@
 // File: /api/verify.js
-// Vercel এর সাথে সামঞ্জস্যপূর্ণ করার জন্য কোডটি আপডেট করা হয়েছে
+// এই ফাইলটি শুধুমাত্র টেলিগ্রাম চ্যানেলে সদস্যপদ যাচাই করবে
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   // শুধুমাত্র POST রিকোয়েস্ট গ্রহণ করা হবে
   if (req.method !== 'POST') {
     return res.status(405).json({ success: false, message: 'Method Not Allowed' });
@@ -21,7 +21,6 @@ module.exports = async (req, res) => {
   try {
     const url = `https://api.telegram.org/bot${BOT_TOKEN}/getChatMember?chat_id=${CHANNEL_ID}&user_id=${userId}`;
     
-    // টেলিগ্রাম API-তে রিকোয়েস্ট পাঠানো হচ্ছে
     const telegramResponse = await fetch(url);
     const data = await telegramResponse.json();
 
@@ -37,4 +36,4 @@ module.exports = async (req, res) => {
     console.error("Error verifying user:", error);
     return res.status(500).json({ success: false, message: 'An internal server error occurred.' });
   }
-};
+}
